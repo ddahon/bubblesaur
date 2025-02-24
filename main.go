@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
@@ -14,13 +14,16 @@ type model struct {
 	player       player
 	screenHeight int
 	screenWidth  int
+	lastTick     time.Time
 }
 
 type player struct {
 	spriteWidth  int
 	spriteHeight int
 	spriteChar   rune
-	y            int
+	y            float32
+	ySpeed       float32
+	jumpSpeed    float32
 }
 
 func (p player) view() string {
@@ -31,9 +34,12 @@ func (p player) view() string {
 	return strings.Repeat(row+"\n", p.spriteHeight)
 }
 
+func (p *player) jump() {
+	p.ySpeed = p.jumpSpeed
+}
+
 func initialModel() model {
 	screenWidth, screenHeight, err := term.GetSize(int(os.Stdin.Fd()))
-	fmt.Println(screenHeight)
 	if err != nil {
 		log.Fatalf("Failed to get terminal size: %s", err)
 	}
@@ -41,12 +47,15 @@ func initialModel() model {
 		spriteWidth:  4,
 		spriteHeight: 5,
 		spriteChar:   '*',
-		y:            screenHeight,
+		y:            float32(screenHeight),
+		ySpeed:       0,
+		jumpSpeed:    2,
 	}
 	return model{
 		player:       player,
 		screenHeight: screenHeight,
 		screenWidth:  screenWidth,
+		lastTick:     time.Now(),
 	}
 }
 
@@ -60,19 +69,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case " ":
+			m.player.jump()
 		}
+	case tickMsg:
+		m.mainLoop()
 	}
 
 	return m, nil
 }
 
+func (m *model) mainLoop() {
+	deltaT := float32(time.Now().Sub(m.lastTick).Seconds())
+	m.lastTick = time.Now()
+	m.player.y += m.player.ySpeed * deltaT * -1
+}
+
 func (m model) View() string {
-	y_padding := strings.Repeat("\n", m.player.y-m.player.spriteHeight-1)
+	y_padding := strings.Repeat("\n", int(m.player.y)-m.player.spriteHeight-1)
 	return y_padding + m.player.view()
+}
+
+type tickMsg struct{}
+
+func tick(p *tea.Program, fps int) {
+	time.Sleep(time.Duration(1/fps) * time.Second)
+	p.Send(tickMsg{})
 }
 
 func main() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	go func() {
+		for {
+			tick(p, 30)
+		}
+	}()
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
