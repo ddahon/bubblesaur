@@ -49,7 +49,7 @@ func initialModel() model {
 		spriteChar:   '*',
 		y:            float32(screenHeight),
 		ySpeed:       0,
-		jumpSpeed:    2,
+		jumpSpeed:    20,
 	}
 	return model{
 		player:       player,
