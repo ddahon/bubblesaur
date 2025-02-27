@@ -24,6 +24,7 @@ type player struct {
 	y            float32
 	ySpeed       float32
 	jumpSpeed    float32
+	gravity      float32
 }
 
 func (p player) view() string {
@@ -32,6 +33,10 @@ func (p player) view() string {
 		p.spriteWidth,
 	)
 	return strings.Repeat(row+"\n", p.spriteHeight)
+}
+
+func (p player) isGrounded(floorHeight float32) bool {
+	return p.y == float32(floorHeight)
 }
 
 func (p *player) jump() {
@@ -50,6 +55,7 @@ func initialModel() model {
 		y:            float32(screenHeight),
 		ySpeed:       0,
 		jumpSpeed:    20,
+		gravity:      20,
 	}
 	return model{
 		player:       player,
@@ -70,7 +76,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case " ":
-			m.player.jump()
+			if m.player.isGrounded(float32(m.screenHeight)) {
+				m.player.jump()
+			}
 		}
 	case tickMsg:
 		m.mainLoop()
@@ -83,6 +91,10 @@ func (m *model) mainLoop() {
 	deltaT := float32(time.Now().Sub(m.lastTick).Seconds())
 	m.lastTick = time.Now()
 	m.player.y += m.player.ySpeed * deltaT * -1
+	m.player.y = min(m.player.y, float32(m.screenHeight))
+	if !m.player.isGrounded(float32(m.screenHeight)) {
+		m.player.ySpeed += m.player.gravity * deltaT * -1
+	}
 }
 
 func (m model) View() string {
