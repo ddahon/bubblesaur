@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -14,33 +15,70 @@ type model struct {
 	player       player
 	screenHeight int
 	screenWidth  int
+	screen       [][]string
 	lastTick     time.Time
+	enemies      []enemy
+	n            int
+}
+
+type sprite struct {
+	width  int
+	height int
+	char   rune
 }
 
 type player struct {
-	spriteWidth  int
-	spriteHeight int
-	spriteChar   rune
-	y            float32
-	ySpeed       float32
-	jumpSpeed    float32
-	gravity      float32
+	sprite
+	y         float32
+	ySpeed    float32
+	jumpSpeed float32
+	gravity   float32
 }
 
-func (p player) view() string {
-	row := strings.Repeat(
-		string(p.spriteChar),
-		p.spriteWidth,
-	)
-	return strings.Repeat(row+"\n", p.spriteHeight)
+type enemy struct {
+	sprite
+	xSpeed float32
+	x      float32
+}
+
+func (s sprite) render(screen [][]string, x int, y int) {
+	for i := 0; i < s.width; i++ {
+		for j := 0; j < s.height; j++ {
+			screen[y-j][x+i] = string(s.char)
+		}
+	}
 }
 
 func (p player) isGrounded(floorHeight float32) bool {
-	return p.y == float32(floorHeight)
+	return p.y == floorHeight
 }
 
 func (p *player) jump() {
 	p.ySpeed = p.jumpSpeed
+}
+
+func (m *model) spawnEnemy() {
+	e := enemy{
+		sprite: sprite{
+			height: 2,
+			width:  4,
+			char:   'X',
+		},
+		x: float32(m.screenWidth - 4 - 1),
+	}
+	m.enemies = append(m.enemies, e)
+	m.n = m.n + 1
+	w, _ := tea.LogToFile("/tmp/tea.log", "")
+	fmt.Fprintf(w, "%v", m.n)
+}
+
+func (m *model) resetScreen() {
+	for i := 0; i < m.screenHeight; i++ {
+		m.screen[i] = make([]string, m.screenWidth)
+		for j := 0; j < m.screenWidth; j++ {
+			m.screen[i][j] = " "
+		}
+	}
 }
 
 func initialModel() model {
@@ -49,20 +87,28 @@ func initialModel() model {
 		log.Fatalf("Failed to get terminal size: %s", err)
 	}
 	player := player{
-		spriteWidth:  4,
-		spriteHeight: 5,
-		spriteChar:   '*',
-		y:            float32(screenHeight),
-		ySpeed:       0,
-		jumpSpeed:    20,
-		gravity:      20,
+		sprite: sprite{
+			width:  4,
+			height: 5,
+			char:   '*',
+		},
+		y:         float32(screenHeight - 1),
+		ySpeed:    0,
+		jumpSpeed: 20,
+		gravity:   30,
 	}
-	return model{
+	m := model{
 		player:       player,
 		screenHeight: screenHeight,
 		screenWidth:  screenWidth,
+		screen:       make([][]string, screenWidth),
 		lastTick:     time.Now(),
+		enemies:      make([]enemy, 0),
 	}
+
+	m.resetScreen()
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -76,12 +122,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case " ":
-			if m.player.isGrounded(float32(m.screenHeight)) {
+			if m.player.isGrounded(float32(m.screenHeight - 1)) {
 				m.player.jump()
 			}
 		}
 	case tickMsg:
 		m.mainLoop()
+	case spawnMsg:
+		m.spawnEnemy()
 	}
 
 	return m, nil
@@ -91,16 +139,27 @@ func (m *model) mainLoop() {
 	deltaT := float32(time.Now().Sub(m.lastTick).Seconds())
 	m.lastTick = time.Now()
 	m.player.y += m.player.ySpeed * deltaT * -1
-	m.player.y = min(m.player.y, float32(m.screenHeight))
-	if !m.player.isGrounded(float32(m.screenHeight)) {
+	m.player.y = min(m.player.y, float32(m.screenHeight-1))
+	if !m.player.isGrounded(float32(m.screenHeight - 1)) {
 		m.player.ySpeed += m.player.gravity * deltaT * -1
 	}
 }
 
 func (m model) View() string {
-	y_padding := strings.Repeat("\n", int(m.player.y)-m.player.spriteHeight-1)
-	return y_padding + m.player.view()
+	m.resetScreen()
+	m.player.sprite.render(m.screen, 0, int(m.player.y))
+	for i := 0; i < len(m.enemies); i++ {
+		m.enemies[i].sprite.render(m.screen, int(m.enemies[i].x), m.screenHeight-1)
+	}
+
+	res := ""
+	for i := 0; i < m.screenHeight; i++ {
+		res += strings.Join(m.screen[i], "") + "\n"
+	}
+	return res
 }
+
+type spawnMsg struct{}
 
 type tickMsg struct{}
 
@@ -116,6 +175,13 @@ func main() {
 			tick(p, 30)
 		}
 	}()
+	go func() {
+		for {
+			p.Send(spawnMsg{})
+			time.Sleep(time.Duration(4) * time.Second)
+		}
+	}()
+
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
