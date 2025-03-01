@@ -64,7 +64,8 @@ func (m *model) spawnEnemy() {
 			width:  4,
 			char:   'X',
 		},
-		x: float32(m.screenWidth - 4 - 1),
+		x:      float32(m.screenWidth - 4 - 1),
+		xSpeed: -25,
 	}
 	m.enemies = append(m.enemies, e)
 	m.n = m.n + 1
@@ -138,10 +139,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) mainLoop() {
 	deltaT := float32(time.Now().Sub(m.lastTick).Seconds())
 	m.lastTick = time.Now()
+
+	// Update player position
 	m.player.y += m.player.ySpeed * deltaT * -1
 	m.player.y = min(m.player.y, float32(m.screenHeight-1))
 	if !m.player.isGrounded(float32(m.screenHeight - 1)) {
 		m.player.ySpeed += m.player.gravity * deltaT * -1
+	}
+
+	// Update enemies position
+	for i := 0; i < len(m.enemies); i++ {
+		m.enemies[i].x += m.enemies[i].xSpeed * deltaT
 	}
 }
 
