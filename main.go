@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -149,16 +150,20 @@ func (m *model) mainLoop() {
 
 	// Update enemies position
 	for i := 0; i < len(m.enemies); i++ {
+		if m.enemies[i].x < m.enemies[i].xSpeed*deltaT {
+			m.enemies = slices.Delete(m.enemies, i, i+1)
+			continue
+		}
 		m.enemies[i].x += m.enemies[i].xSpeed * deltaT
 	}
 }
 
 func (m model) View() string {
 	m.resetScreen()
-	m.player.sprite.render(m.screen, 0, int(m.player.y))
 	for i := 0; i < len(m.enemies); i++ {
 		m.enemies[i].sprite.render(m.screen, int(m.enemies[i].x), m.screenHeight-1)
 	}
+	m.player.sprite.render(m.screen, 0, int(m.player.y))
 
 	res := ""
 	for i := 0; i < m.screenHeight; i++ {
