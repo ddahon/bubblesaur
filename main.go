@@ -40,6 +40,11 @@ type enemy struct {
 	sprite
 	xSpeed float32
 	x      float32
+	y      float32
+}
+
+func (e enemy) collidesWith(p player) bool {
+	return e.x <= float32(p.width) && p.y >= e.y-float32(e.height)
 }
 
 func (s sprite) render(screen [][]string, x int, y int) {
@@ -66,7 +71,8 @@ func (m *model) spawnEnemy() {
 			char:   'X',
 		},
 		x:      float32(m.screenWidth - 4 - 1),
-		xSpeed: -25,
+		xSpeed: -40,
+		y:      float32(m.screenHeight),
 	}
 	m.enemies = append(m.enemies, e)
 	m.n = m.n + 1
@@ -148,14 +154,21 @@ func (m *model) mainLoop() {
 		m.player.ySpeed += m.player.gravity * deltaT * -1
 	}
 
-	// Update enemies position
+	// Update enemies position and detect collisions
 	for i := 0; i < len(m.enemies); i++ {
 		if m.enemies[i].x < m.enemies[i].xSpeed*deltaT {
 			m.enemies = slices.Delete(m.enemies, i, i+1)
 			continue
 		}
 		m.enemies[i].x += m.enemies[i].xSpeed * deltaT
+		if m.enemies[i].collidesWith(m.player) {
+			gameOver()
+		}
 	}
+}
+
+func gameOver() {
+	panic("unimplemented")
 }
 
 func (m model) View() string {
