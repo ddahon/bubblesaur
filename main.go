@@ -20,6 +20,8 @@ type model struct {
 	lastTick     time.Time
 	enemies      []enemy
 	n            int
+	score        float32
+	gameOver     bool
 }
 
 type sprite struct {
@@ -112,6 +114,7 @@ func initialModel() model {
 		screen:       make([][]string, screenWidth),
 		lastTick:     time.Now(),
 		enemies:      make([]enemy, 0),
+		gameOver:     false,
 	}
 
 	m.resetScreen()
@@ -127,7 +130,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 		case " ":
 			if m.player.isGrounded(float32(m.screenHeight - 1)) {
@@ -139,7 +142,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spawnMsg:
 		m.spawnEnemy()
 	}
-
 	return m, nil
 }
 
@@ -162,22 +164,31 @@ func (m *model) mainLoop() {
 		}
 		m.enemies[i].x += m.enemies[i].xSpeed * deltaT
 		if m.enemies[i].collidesWith(m.player) {
-			gameOver()
+			m.gameOver = true
 		}
 	}
-}
 
-func gameOver() {
-	panic("unimplemented")
+	// Update score
+	if !m.gameOver {
+		m.score += deltaT * 10
+	}
 }
 
 func (m model) View() string {
 	m.resetScreen()
+	if m.gameOver {
+		return fmt.Sprintf("Game Over :( Your score: %v.\nPress q to quit", int(m.score))
+	}
 	for i := 0; i < len(m.enemies); i++ {
 		m.enemies[i].sprite.render(m.screen, int(m.enemies[i].x), m.screenHeight-1)
 	}
 	m.player.sprite.render(m.screen, 0, int(m.player.y))
 
+	// Add score to screen
+	scoreDisplay := fmt.Sprintf("Score: %v", int(m.score))
+	for i, v := range strings.Split(scoreDisplay, "") {
+		m.screen[1][i] = v
+	}
 	res := ""
 	for i := 0; i < m.screenHeight; i++ {
 		res += strings.Join(m.screen[i], "") + "\n"
