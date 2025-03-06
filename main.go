@@ -22,6 +22,7 @@ type model struct {
 	n            int
 	score        float32
 	gameOver     bool
+	xSpeed       float32
 }
 
 type sprite struct {
@@ -73,7 +74,7 @@ func (m *model) spawnEnemy() {
 			char:   'X',
 		},
 		x:      float32(m.screenWidth - 4 - 1),
-		xSpeed: -40,
+		xSpeed: m.xSpeed,
 		y:      float32(m.screenHeight),
 	}
 	m.enemies = append(m.enemies, e)
@@ -115,6 +116,7 @@ func initialModel() model {
 		lastTick:     time.Now(),
 		enemies:      make([]enemy, 0),
 		gameOver:     false,
+		xSpeed:       -40,
 	}
 
 	m.resetScreen()
@@ -172,6 +174,9 @@ func (m *model) mainLoop() {
 	if !m.gameOver {
 		m.score += deltaT * 10
 	}
+
+	// Accelerate game
+	m.xSpeed += m.xSpeed * 0.05 * deltaT
 }
 
 func (m model) View() string {
